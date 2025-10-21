@@ -1,0 +1,20 @@
+{
+  "name": "email-verifier",
+  "version": "0.1.0",
+  "description": "A small utility to verify emails using reoon",
+  "main": "email-verifier.js",
+  "scripts": {
+    "start": "node email-verifier.js"
+  },
+  "keywords": [
+    "email",
+    "verify",
+    "verifier"
+  ],
+  "author": "somratpro",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.12.2",
+    "dotenv": "^17.2.3"
+  }
+}
