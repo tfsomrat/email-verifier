@@ -23,8 +23,8 @@ const VALID_FILE = path.join(OUTPUT_DIR, "valid.json");
 const INVALID_FILE = path.join(OUTPUT_DIR, "invalid.json");
 const TASK_INFO_FILE = path.join(OUTPUT_DIR, "task-info.json");
 
-// Load the filtered leads data from data/input.json
-const INPUT_FILE = path.join(INPUT_DIR, "input.json");
+// Load the filtered leads data from input/data.json
+const INPUT_FILE = path.join(INPUT_DIR, "data.json");
 
 if (!fs.existsSync(INPUT_FILE)) {
   console.error(`Error: input file not found at ${INPUT_FILE}`);

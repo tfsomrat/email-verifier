@@ -4,7 +4,7 @@ Simple bulk email verification script using the Reoon Email Verifier API.
 
 ## What this does
 
-- Reads input leads from `input/input.json` (an array of objects with an `email` field).
+- Reads input leads from `input/data.json` (an array of objects with an `email` field).
 - Sends emails in bulk to the Reoon bulk verification API.
 - Polls for results and writes verified records into `output/valid.json` and invalid ones into `output/invalid.json`.
 - Supports resuming an in-progress bulk task via `output/task-info.json`.
@@ -23,7 +23,7 @@ yarn install
 REOON_API_KEY=your_api_key_here
 ```
 
-3. Put your input data in `input/input.json`.
+3. Put your input data in `input/data.json`.
 
 - The file should contain a JSON array of objects. Each object should include at least an `email` property, e.g.:
 
@@ -52,11 +52,11 @@ This will run `email-verifier.js` which will process the emails and write output
 
 ## Notes
 
-- The script expects `input/input.json` and writes output files to the `output/` directory.
+- The script expects `input/data.json` and writes output files to the `output/` directory.
 - If you need to restart processing from scratch, remove `output/task-info.json`.
 - The script requires a valid API key with enough credits.
 
 ## Troubleshooting
 
 - If you see an error about `REOON_API_KEY` missing, check your `.env` file is present and correct.
-- Ensure `input/input.json` is valid JSON.
+- Ensure `input/data.json` is valid JSON.
