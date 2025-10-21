@@ -69,25 +69,85 @@ async function checkAccountBalance() {
   }
 }
 
+// Validate email format (basic check)
+function isValidEmailFormat(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+// Clean and deduplicate emails before sending
+function cleanEmailList(emailList) {
+  const validEmails = [];
+  const invalidEmails = [];
+  const seen = new Set();
+
+  for (const email of emailList) {
+    const lowerEmail = email.toLowerCase().trim();
+
+    if (!isValidEmailFormat(lowerEmail)) {
+      invalidEmails.push(email);
+    } else if (seen.has(lowerEmail)) {
+      // Duplicate found
+    } else {
+      validEmails.push(email);
+      seen.add(lowerEmail);
+    }
+  }
+
+  return {
+    validEmails,
+    invalidCount: invalidEmails.length,
+    duplicateCount:
+      emailList.length - validEmails.length - invalidEmails.length,
+    invalidEmails,
+  };
+}
+
 // Create a bulk verification task
 async function createBulkTask(emailList, taskName) {
   try {
+    // Clean and validate emails before sending
+    const cleanedData = cleanEmailList(emailList);
+    const { validEmails, invalidCount, duplicateCount, invalidEmails } =
+      cleanedData;
+
+    // Log pre-submission stats
+    if (duplicateCount > 0 || invalidCount > 0) {
+      console.log(`\n📋 Pre-submission validation:`);
+      if (duplicateCount > 0) {
+        console.log(`   ⚠️  Duplicates found (local): ${duplicateCount}`);
+      }
+      if (invalidCount > 0) {
+        console.log(`   ⚠️  Invalid format (local): ${invalidCount}`);
+        if (invalidEmails.length <= 5) {
+          invalidEmails.forEach((email) => {
+            console.log(`      → ${email}`);
+          });
+        }
+      }
+    }
+
     const payload = {
       name: taskName,
-      emails: emailList,
+      emails: validEmails,
       key: API_KEY,
     };
 
     const response = await axios.post(CREATE_BULK_TASK_URL, payload);
 
     if (response.status === 201 && response.data.status === "success") {
-      console.log(`✅ Task created successfully!`);
+      console.log(`\n✅ Task created successfully!`);
       console.log(`   Task ID: ${response.data.task_id}`);
       console.log(`   Emails Submitted: ${response.data.count_submitted}`);
       console.log(
-        `   Duplicates Removed: ${response.data.count_duplicates_removed}`
+        `   Duplicates Removed (API): ${response.data.count_duplicates_removed}`
       );
-      console.log(`   Rejected Emails: ${response.data.count_rejected_emails}`);
+      console.log(
+        `   Rejected Emails (API): ${response.data.count_rejected_emails}`
+      );
+      console.log(`   Total Submitted (Local): ${validEmails.length}`);
+      console.log(`   Total Duplicates (Local): ${duplicateCount}`);
+      console.log(`   Total Invalid Format (Local): ${invalidCount}`);
       console.log(`   Processing: ${response.data.count_processing}`);
       return response.data;
     } else {
@@ -324,6 +384,8 @@ async function processEmails() {
 
   let totalValid = 0;
   let totalInvalid = 0;
+  let totalDuplicates = 0;
+  let totalRejected = 0;
 
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
     const batch = batches[batchIndex];
@@ -341,6 +403,10 @@ async function processEmails() {
       console.error(`❌ Failed to create task for batch ${batchIndex + 1}`);
       continue;
     }
+
+    // Track API-reported stats
+    totalDuplicates += taskResult.count_duplicates_removed || 0;
+    totalRejected += taskResult.count_rejected_emails || 0;
 
     // Save task info for resumability
     saveTaskInfo(taskResult.task_id, batch);
@@ -370,8 +436,13 @@ async function processEmails() {
   console.log(`✓ Email verification complete!`);
   console.log(`${"=".repeat(60)}`);
   console.log(`📊 Final Results:`);
+  console.log(`\n   Verification Results:`);
   console.log(`   ✅ Valid emails: ${totalValid}`);
   console.log(`   ❌ Invalid emails: ${totalInvalid}`);
+  console.log(`\n   Data Quality:`);
+  console.log(`   📌 Duplicates removed (API): ${totalDuplicates}`);
+  console.log(`   📌 Rejected emails (API): ${totalRejected}`);
+  console.log(`\n   Output Files:`);
   console.log(`   📁 Valid emails saved to: ${VALID_FILE}`);
   console.log(`   📁 Invalid emails saved to: ${INVALID_FILE}`);
 
