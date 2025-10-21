@@ -248,12 +248,15 @@ function getAlreadyVerifiedEmails() {
 }
 
 // Save task info for resumability
-function saveTaskInfo(taskId, emailList) {
+function saveTaskInfo(taskId, emailList, batchIndex, totalBatches) {
   const taskInfo = {
     taskId,
+    batchIndex,
+    totalBatches,
     createdAt: new Date().toISOString(),
     emailCount: emailList.length,
     emails: emailList,
+    status: "processing",
   };
   fs.writeFileSync(TASK_INFO_FILE, JSON.stringify(taskInfo, null, 2), "utf-8");
 }
@@ -340,7 +343,76 @@ function appendToJsonFile(filePath, entry, isFirstEntry) {
 async function processEmails() {
   console.log("🚀 Starting Email Verification using Bulk API...\n");
 
-  // Check account balance first
+  // Check for existing task info (resume from crash)
+  const existingTaskInfo = loadTaskInfo();
+  let resumeFromBatch = 0;
+  let resumeTaskId = null;
+
+  if (existingTaskInfo) {
+    console.log("⏸️  Found incomplete task - Attempting to resume...\n");
+    console.log(`📋 Task Info:`);
+    console.log(`   Task ID: ${existingTaskInfo.taskId}`);
+    console.log(
+      `   Batch: ${existingTaskInfo.batchIndex} / ${existingTaskInfo.totalBatches}`
+    );
+    console.log(`   Created: ${existingTaskInfo.createdAt}`);
+    console.log(`   Emails: ${existingTaskInfo.emailCount}\n`);
+
+    resumeFromBatch = existingTaskInfo.batchIndex;
+    resumeTaskId = existingTaskInfo.taskId;
+
+    // Try to get results from the pending task
+    console.log("🔍 Checking if previous task is completed...\n");
+    const previousResults = await pollTaskResults(resumeTaskId, 30000); // 30 sec timeout for check
+
+    if (previousResults && previousResults.status === "completed") {
+      console.log("\n✅ Previous task completed! Retrieving results...\n");
+
+      // Create lead map for existing task
+      const leadMap = new Map();
+      existingTaskInfo.emails.forEach((email) => {
+        const lead = leads.find(
+          (l) => l.email.toLowerCase() === email.toLowerCase()
+        );
+        if (lead) {
+          leadMap.set(email.toLowerCase(), lead);
+        }
+      });
+
+      // Process and save the completed task results
+      const { validCount, invalidCount } = saveResults(
+        previousResults.results,
+        leadMap
+      );
+
+      console.log(
+        `\n   Recovered Results: ${validCount} valid, ${invalidCount} invalid`
+      );
+
+      // Clean up and continue to next batch
+      if (fs.existsSync(TASK_INFO_FILE)) {
+        fs.unlinkSync(TASK_INFO_FILE);
+      }
+
+      resumeFromBatch += 1; // Move to next batch
+      resumeTaskId = null;
+    } else if (previousResults) {
+      console.log(
+        `⏳ Previous task still processing (Status: ${previousResults.status})`
+      );
+      console.log(
+        "Please wait for it to complete or manually delete task-info.json to start fresh.\n"
+      );
+      return;
+    } else {
+      console.log("⚠️  Could not reach previous task. Starting fresh...\n");
+      if (fs.existsSync(TASK_INFO_FILE)) {
+        fs.unlinkSync(TASK_INFO_FILE);
+      }
+    }
+  }
+
+  // Check account balance
   await checkAccountBalance();
 
   const alreadyVerified = getAlreadyVerifiedEmails();
@@ -381,13 +453,22 @@ async function processEmails() {
   }
 
   console.log(`📦 Processing in ${batches.length} bulk task(s)...\n`);
+  if (resumeFromBatch > 0) {
+    console.log(
+      `📌 Resuming from Batch ${resumeFromBatch + 1}/${batches.length}\n`
+    );
+  }
 
   let totalValid = 0;
   let totalInvalid = 0;
   let totalDuplicates = 0;
   let totalRejected = 0;
 
-  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+  for (
+    let batchIndex = resumeFromBatch;
+    batchIndex < batches.length;
+    batchIndex++
+  ) {
     const batch = batches[batchIndex];
     const taskName = `Batch ${batchIndex + 1}/${batches.length} (${
       batch.length
@@ -409,7 +490,7 @@ async function processEmails() {
     totalRejected += taskResult.count_rejected_emails || 0;
 
     // Save task info for resumability
-    saveTaskInfo(taskResult.task_id, batch);
+    saveTaskInfo(taskResult.task_id, batch, batchIndex, batches.length);
 
     // Poll for results
     console.log(`\n⏳ Waiting for verification results...`);
