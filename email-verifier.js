@@ -283,22 +283,8 @@ function saveResults(results, leadMap) {
     const leadItem = leadMap.get(email.toLowerCase());
     if (!leadItem) continue;
 
-    let targetFile;
-    let isValid;
-
-    // Based on bulk API response fields
-    if (
-      result.is_disposable ||
-      result.is_spamtrap ||
-      result.is_disabled ||
-      !result.is_safe_to_send
-    ) {
-      targetFile = INVALID_FILE;
-      isValid = false;
-    } else {
-      targetFile = VALID_FILE;
-      isValid = true;
-    }
+    const isValid = isEmailValid(result);
+    const targetFile = isValid ? VALID_FILE : INVALID_FILE;
 
     const isFirstEntry = !fs.existsSync(targetFile);
     appendToJsonFile(targetFile, leadItem, isFirstEntry);
@@ -317,6 +303,25 @@ function saveResults(results, leadMap) {
   }
 
   return { validCount, invalidCount };
+}
+
+// Validate email based on all verification criteria
+function isEmailValid(result) {
+  const isDeliverable = result.is_deliverable !== false;
+  const hasValidSyntax = result.is_valid_syntax !== false;
+  const isNotDisposable = result.is_disposable !== true;
+  const isNotSpamtrap = result.is_spamtrap !== true;
+  const isNotDisabled = result.is_disabled !== true;
+  const isSafeToSend = result.is_safe_to_send !== false;
+
+  return (
+    isDeliverable &&
+    hasValidSyntax &&
+    isNotDisposable &&
+    isNotSpamtrap &&
+    isNotDisabled &&
+    isSafeToSend
+  );
 }
 
 // Append entry to JSON file
