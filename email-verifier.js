@@ -1,9 +1,12 @@
 const fs = require("fs");
 const axios = require("axios");
 const path = require("path");
-
-// Load environment variables from .env file
 require("dotenv").config({ path: path.join(__dirname, ".env") });
+
+// Configuration
+const BATCH_SIZE = 100; // Max emails per bulk task
+const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
+const MAX_POLLING_TIME_MS = 3600000; // 1 hour max
 
 // Bulk API endpoints
 const CREATE_BULK_TASK_URL =
@@ -19,11 +22,6 @@ const OUTPUT_DIR = path.join(__dirname, "output");
 const VALID_FILE = path.join(OUTPUT_DIR, "valid.json");
 const INVALID_FILE = path.join(OUTPUT_DIR, "invalid.json");
 const TASK_INFO_FILE = path.join(OUTPUT_DIR, "task-info.json");
-
-// Configuration
-const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
-const MAX_POLLING_TIME_MS = 3600000; // 1 hour max
-const BATCH_SIZE = 5; // Max emails per bulk task
 
 // Load the filtered leads data from data/input.json
 const INPUT_FILE = path.join(INPUT_DIR, "input.json");
